@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Interactive Rubik's Cube</title>
+    <title>Cubo de Rubik 3D interactivo</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; user-select: none; }
         canvas { display: block; outline: none; }
@@ -119,6 +119,28 @@
         }
         
         .key-hint { color: #4ade80; font-weight: bold; }
+
+        /* Estilos Responsivos para Celulares (Modo Retrato 9:16) */
+        @media (max-width: 600px), (max-aspect-ratio: 1/1) {
+            #ui-container {
+                top: auto;
+                bottom: 15px;
+                left: 15px;
+                right: 15px;
+                max-width: none;
+                padding: 15px;
+                max-height: 45vh; /* Evita que el panel tape más de la mitad del cubo */
+                overflow-y: auto; /* Permite hacer scroll si la pantalla es muy pequeña */
+            }
+
+            .instructions {
+                display: none; /* Oculta las instrucciones en celular para ahorrar espacio */
+            }
+
+            .manual-btn {
+                padding: 15px 0; /* Botones más grandes y cómodos para pantallas táctiles */
+            }
+        }
     </style>
 </head>
 <body>
@@ -126,20 +148,20 @@
     <canvas id="bg-canvas"></canvas>
 
     <div id="ui-container">
-        <h1>Rubik's Cube</h1>
+        <h1>Cubo de Rubik</h1>
         
         <div class="main-controls">
-            <button id="btn-scramble">Scramble</button>
-            <button id="btn-solve" disabled>Solve</button>
+            <button id="btn-scramble">Desordenar</button>
+            <button id="btn-solve" disabled>Resolver</button>
         </div>
         
-        <button id="btn-crazy">Crazy Mode 🤪</button>
+        <button id="btn-crazy">Modo Loco 🤪</button>
 
-        <div class="section-title">Manual Control</div>
+        <div class="section-title">Control Manual</div>
         
         <label class="toggle-container">
             <input type="checkbox" id="chk-inverse"> 
-            Inverse (Counter-Clockwise)
+            Inverso (Antihorario)
         </label>
 
         <div class="manual-grid">
@@ -152,16 +174,16 @@
         </div>
 
         <div class="status">
-            <span>Moves in memory:</span>
+            <span>Movimientos en memoria:</span>
             <span id="move-counter">0</span>
         </div>
 
         <div class="instructions">
-            <strong>Controls:</strong><br>
-            • Buttons above or Keyboard<br>
-            • Keys: <span class="key-hint">U D L R F B</span><br>
-            • Hold <span class="key-hint">Shift</span> for inverse<br>
-            • Mouse: Drag to rotate view
+            <strong>Controles:</strong><br>
+            • Botones arriba o Teclado<br>
+            • Teclas: <span class="key-hint">U D L R F B</span><br>
+            • Mantener <span class="key-hint">Shift</span> para inverso<br>
+            • Táctil/Ratón: Arrastrar para rotar vista
         </div>
     </div>
 
@@ -215,7 +237,14 @@
             // scene.background = new THREE.Color(0x111111); 
 
             camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
-            camera.position.set(6, 5, 8);
+            
+            // Ajustar la posición inicial de la cámara para celulares (modo retrato)
+            const aspect = window.innerWidth / window.innerHeight;
+            if (aspect < 1) {
+                camera.position.set(8, 7, 11);
+            } else {
+                camera.position.set(6, 5, 8);
+            }
             camera.lookAt(0, 0, 0);
 
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -277,10 +306,10 @@
         function toggleCrazyMode() {
             isCrazyMode = !isCrazyMode;
             if (isCrazyMode) {
-                btnCrazy.innerText = "Stop Crazy Mode 🛑";
+                btnCrazy.innerText = "Detener Modo Loco 🛑";
                 btnCrazy.style.background = "#dc2626"; // Red
             } else {
-                btnCrazy.innerText = "Crazy Mode 🤪";
+                btnCrazy.innerText = "Modo Loco 🤪";
                 btnCrazy.style.background = "#9333ea"; // Purple
             }
         }
@@ -665,11 +694,20 @@
             btnSolve.disabled = moveStack.length === 0;
             
             // Visual toggle of scramble button text
-            btnScramble.innerText = moveStack.length > 0 ? "Add Scramble" : "Scramble";
+            btnScramble.innerText = moveStack.length > 0 ? "Añadir Desorden" : "Desordenar";
         }
 
         function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
+            const aspect = window.innerWidth / window.innerHeight;
+            camera.aspect = aspect;
+            
+            // Ajustar la distancia de la cámara dinámicamente al redimensionar o girar el celular
+            if (aspect < 1) {
+                camera.position.set(8, 7, 11);
+            } else {
+                camera.position.set(6, 5, 8);
+            }
+            
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
             resizeBg(); // Resize background too
