@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cubo de Rubik 3D</title>
+    <title>Rubik 3D</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; user-select: none; }
         canvas { display: block; outline: none; }
@@ -241,7 +241,7 @@
             // Ajustar la posición inicial de la cámara para celulares (modo retrato)
             const aspect = window.innerWidth / window.innerHeight;
             if (aspect < 1) {
-                camera.position.set(8, 7, 11);
+                camera.position.set(8, 8, 12);
             } else {
                 camera.position.set(6, 5, 8);
             }
@@ -259,6 +259,14 @@
             controls.enablePan = false;
             controls.minDistance = 3;
             controls.maxDistance = 20;
+
+            // Desplazar el centro de rotación hacia abajo en celulares para que el cubo suba visualmente
+            if (aspect < 1) {
+                controls.target.set(0, -1.8, 0);
+            } else {
+                controls.target.set(0, 0, 0);
+            }
+            controls.update();
 
             // Enhanced Lighting
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
@@ -701,12 +709,15 @@
             const aspect = window.innerWidth / window.innerHeight;
             camera.aspect = aspect;
             
-            // Ajustar la distancia de la cámara dinámicamente al redimensionar o girar el celular
+            // Ajustar la distancia y posición de la cámara dinámicamente al redimensionar
             if (aspect < 1) {
-                camera.position.set(8, 7, 11);
+                camera.position.set(8, 8, 12);
+                controls.target.set(0, -1.8, 0);
             } else {
                 camera.position.set(6, 5, 8);
+                controls.target.set(0, 0, 0);
             }
+            controls.update();
             
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
