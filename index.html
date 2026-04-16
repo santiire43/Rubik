@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Interactive Rubik's Cube</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; user-select: none; }
+        canvas { display: block; outline: none; }
+        
+        #bg-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+        }
+
+        #ui-container {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            z-index: 10;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            border-radius: 12px;
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255,255,255,0.1);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            max-width: 250px;
+        }
+
+        h1 { margin: 0 0 15px 0; font-size: 1.4rem; text-transform: uppercase; letter-spacing: 2px; color: #fff; border-bottom: 1px solid #444; padding-bottom: 10px; }
+        
+        .section-title { font-size: 0.85rem; text-transform: uppercase; color: #888; margin-top: 15px; margin-bottom: 8px; font-weight: bold; }
+
+        .main-controls { display: flex; gap: 10px; margin-bottom: 10px; }
+
+        button {
+            flex: 1;
+            padding: 10px;
+            cursor: pointer;
+            background: #2563eb;
+            border: none;
+            color: white;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        button:hover { background: #1d4ed8; transform: translateY(-1px); }
+        button:active { transform: translateY(1px); }
+        button:disabled { background: #4b5563; cursor: not-allowed; opacity: 0.6; transform: none; }
+
+        #btn-crazy {
+            width: 100%;
+            background: #9333ea; /* Purple */
+            margin-bottom: 15px;
+        }
+        #btn-crazy:hover { background: #7e22ce; }
+
+        /* Manual Control Grid */
+        .manual-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+        }
+
+        .manual-btn {
+            background: #374151;
+            padding: 8px 0;
+            font-family: monospace;
+            font-size: 1.1rem;
+        }
+        
+        .manual-btn:hover { background: #4b5563; }
+        
+        .manual-btn[data-face="U"] { border-bottom: 2px solid #fff; }
+        .manual-btn[data-face="D"] { border-bottom: 2px solid #FFD500; }
+        .manual-btn[data-face="L"] { border-bottom: 2px solid #FF5900; }
+        .manual-btn[data-face="R"] { border-bottom: 2px solid #B90000; }
+        .manual-btn[data-face="F"] { border-bottom: 2px solid #009E60; }
+        .manual-btn[data-face="B"] { border-bottom: 2px solid #0045AD; }
+
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        .toggle-container input { margin-right: 8px; cursor: pointer; }
+
+        .status {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #444;
+            font-size: 0.9rem;
+            color: #ccc;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        #move-counter { color: #4ade80; font-weight: bold; font-family: monospace; font-size: 1.1rem; }
+
+        .instructions {
+            margin-top: 15px;
+            font-size: 0.75rem;
+            color: #999;
+            line-height: 1.4;
+            background: rgba(0,0,0,0.3);
+            padding: 8px;
+            border-radius: 4px;
+        }
+        
+        .key-hint { color: #4ade80; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <canvas id="bg-canvas"></canvas>
+
+    <div id="ui-container">
+        <h1>Rubik's Cube</h1>
+        
+        <div class="main-controls">
+            <button id="btn-scramble">Scramble</button>
+            <button id="btn-solve" disabled>Solve</button>
+        </div>
+        
+        <button id="btn-crazy">Crazy Mode 🤪</button>
+
+        <div class="section-title">Manual Control</div>
+        
+        <label class="toggle-container">
+            <input type="checkbox" id="chk-inverse"> 
+            Inverse (Counter-Clockwise)
+        </label>
+
+        <div class="manual-grid">
+            <button class="manual-btn" data-face="U">U</button>
+            <button class="manual-btn" data-face="F">F</button>
+            <button class="manual-btn" data-face="R">R</button>
+            <button class="manual-btn" data-face="D">D</button>
+            <button class="manual-btn" data-face="B">B</button>
+            <button class="manual-btn" data-face="L">L</button>
+        </div>
+
+        <div class="status">
+            <span>Moves in memory:</span>
+            <span id="move-counter">0</span>
+        </div>
+
+        <div class="instructions">
+            <strong>Controls:</strong><br>
+            • Buttons above or Keyboard<br>
+            • Keys: <span class="key-hint">U D L R F B</span><br>
+            • Hold <span class="key-hint">Shift</span> for inverse<br>
+            • Mouse: Drag to rotate view
+        </div>
+    </div>
+
+    <!-- Three.js from CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <script>
+        // --- Configuration ---
+        const CUBE_SIZE = 1;
+        const SPACING = 0.02; 
+        const ANIMATION_SPEED = 0.15; 
+        
+        const COLORS = {
+            U: 0xFFFFFF, // White
+            D: 0xFFD500, // Yellow
+            R: 0xB90000, // Red
+            L: 0xFF5900, // Orange
+            F: 0x009E60, // Green
+            B: 0x0045AD, // Blue
+            CORE: 0x181818
+        };
+
+        // --- Global Variables ---
+        let scene, camera, renderer, controls;
+        let allCubies = []; 
+        let pivot; 
+        let isAnimating = false;
+        let moveStack = []; 
+        let animationQueue = [];
+
+        // Background Variables
+        const bgCanvas = document.getElementById('bg-canvas');
+        const bgCtx = bgCanvas.getContext('2d');
+        let bgParticles = [];
+        let bgHue = 0;
+        let isCrazyMode = false;
+
+        // UI Elements
+        const btnScramble = document.getElementById('btn-scramble');
+        const btnSolve = document.getElementById('btn-solve');
+        const btnCrazy = document.getElementById('btn-crazy');
+        const moveCounter = document.getElementById('move-counter');
+        const chkInverse = document.getElementById('chk-inverse');
+        const manualBtns = document.querySelectorAll('.manual-btn');
+
+        // --- Initialization ---
+        function init() {
+            scene = new THREE.Scene();
+            // Removed scene.background to allow transparency
+            // scene.background = new THREE.Color(0x111111); 
+
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+            camera.position.set(6, 5, 8);
+            camera.lookAt(0, 0, 0);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            document.body.appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.enablePan = false;
+            controls.minDistance = 3;
+            controls.maxDistance = 20;
+
+            // Enhanced Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+            dirLight.position.set(10, 20, 10);
+            dirLight.castShadow = true;
+            scene.add(dirLight);
+            
+            const fillLight = new THREE.DirectionalLight(0xffffff, 0.5);
+            fillLight.position.set(-10, 0, -10);
+            scene.add(fillLight);
+
+            createRubiksCube();
+
+            pivot = new THREE.Object3D();
+            pivot.rotation.order = "XYZ";
+            scene.add(pivot);
+
+            // Listeners
+            window.addEventListener('resize', onWindowResize);
+            btnScramble.addEventListener('click', scramble);
+            btnSolve.addEventListener('click', solve);
+            btnCrazy.addEventListener('click', toggleCrazyMode);
+            
+            // Manual UI Buttons
+            manualBtns.forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const face = e.target.getAttribute('data-face');
+                    const inverse = chkInverse.checked;
+                    handleManualMove(face, inverse);
+                });
+            });
+
+            // Keyboard Controls
+            window.addEventListener('keydown', handleKeyboard);
+
+            // Initialize Background
+            initBackground();
+
+            animate();
+        }
+
+        function toggleCrazyMode() {
+            isCrazyMode = !isCrazyMode;
+            if (isCrazyMode) {
+                btnCrazy.innerText = "Stop Crazy Mode 🛑";
+                btnCrazy.style.background = "#dc2626"; // Red
+            } else {
+                btnCrazy.innerText = "Crazy Mode 🤪";
+                btnCrazy.style.background = "#9333ea"; // Purple
+            }
+        }
+
+        // --- Background Animation ---
+        function initBackground() {
+            resizeBg();
+            
+            // Create particles
+            for(let i = 0; i < 60; i++) {
+                bgParticles.push(createParticle());
+            }
+        }
+
+        function createParticle() {
+            return {
+                x: Math.random() * bgCanvas.width,
+                y: Math.random() * bgCanvas.height,
+                vx: (Math.random() - 0.5) * 2,
+                vy: (Math.random() - 0.5) * 2,
+                size: Math.random() * 20 + 5,
+                angle: Math.random() * Math.PI * 2,
+                spin: (Math.random() - 0.5) * 0.1,
+                shape: Math.random() > 0.5 ? 'circle' : 'poly',
+                sides: Math.floor(Math.random() * 3) + 3 // 3 to 5 sides
+            };
+        }
+
+        function resizeBg() {
+            bgCanvas.width = window.innerWidth;
+            bgCanvas.height = window.innerHeight;
+        }
+
+        function drawBackground() {
+            
+            if (isCrazyMode) {
+                // Crazy background: Random gradients
+                const grad = bgCtx.createLinearGradient(0, 0, bgCanvas.width, bgCanvas.height);
+                grad.addColorStop(0, `hsla(${Math.random() * 360}, 100%, 50%, 0.1)`);
+                grad.addColorStop(1, `hsla(${Math.random() * 360}, 100%, 50%, 0.1)`);
+                bgCtx.fillStyle = grad;
+                bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
+                
+                // Speed up hue cycle
+                bgHue += 10;
+            } else {
+                // Normal: Trail effect
+                bgCtx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+                bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
+                bgHue = (bgHue + 0.5) % 360;
+            }
+
+            // Additive blending for neon look
+            bgCtx.globalCompositeOperation = 'lighter';
+
+            bgParticles.forEach((p, index) => {
+                if (isCrazyMode) {
+                    // Crazy movement: Jitter and fast random drift
+                    p.x += (Math.random() - 0.5) * 40;
+                    p.y += (Math.random() - 0.5) * 40;
+                    p.angle += 0.5; // Fast spin
+                    
+                    // Wrap around with bounce check fail-safe
+                    if (p.x < 0) p.x = bgCanvas.width;
+                    if (p.x > bgCanvas.width) p.x = 0;
+                    if (p.y < 0) p.y = bgCanvas.height;
+                    if (p.y > bgCanvas.height) p.y = 0;
+                } else {
+                    // Normal Movement
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.angle += p.spin;
+
+                    // Bounce
+                    if(p.x < 0 || p.x > bgCanvas.width) p.vx *= -1;
+                    if(p.y < 0 || p.y > bgCanvas.height) p.vy *= -1;
+                }
+
+                // Draw
+                bgCtx.save();
+                bgCtx.translate(p.x, p.y);
+                bgCtx.rotate(p.angle);
+                
+                // Dynamic Color
+                const color = `hsla(${(bgHue + index * 10) % 360}, 70%, 50%, 0.8)`;
+                bgCtx.strokeStyle = color;
+                bgCtx.lineWidth = 2;
+                bgCtx.fillStyle = color.replace('0.8)', '0.1)'); // Faint fill
+
+                bgCtx.beginPath();
+                if (p.shape === 'circle') {
+                    bgCtx.arc(0, 0, p.size, 0, Math.PI * 2);
+                } else {
+                    // Draw Polygon
+                    bgCtx.moveTo(p.size * Math.cos(0), p.size * Math.sin(0));
+                    for (let i = 1; i <= p.sides; i++) {
+                        bgCtx.lineTo(p.size * Math.cos(i * 2 * Math.PI / p.sides), p.size * Math.sin(i * 2 * Math.PI / p.sides));
+                    }
+                    bgCtx.closePath();
+                }
+                bgCtx.stroke();
+                bgCtx.fill();
+                bgCtx.restore();
+
+                // Connect nearby particles (Plexus effect) - only if not too crazy (perf)
+                if (!isCrazyMode || Math.random() > 0.7) {
+                    for(let j = index + 1; j < bgParticles.length; j++) {
+                        const p2 = bgParticles[j];
+                        const dx = p.x - p2.x;
+                        const dy = p.y - p2.y;
+                        const dist = Math.sqrt(dx*dx + dy*dy);
+
+                        if(dist < 150) {
+                            bgCtx.beginPath();
+                            bgCtx.strokeStyle = `hsla(${(bgHue + dist) % 360}, 50%, 50%, ${1 - dist/150})`;
+                            bgCtx.lineWidth = 1;
+                            bgCtx.moveTo(p.x, p.y);
+                            bgCtx.lineTo(p2.x, p2.y);
+                            bgCtx.stroke();
+                        }
+                    }
+                }
+            });
+
+            // Reset blending
+            bgCtx.globalCompositeOperation = 'source-over';
+        }
+
+        // --- Cube Construction ---
+        function createRubiksCube() {
+            const geometry = new THREE.BoxGeometry(CUBE_SIZE, CUBE_SIZE, CUBE_SIZE);
+            
+            // Rounded edge modifier (visual only)
+            const edgeGeo = new THREE.BoxGeometry(CUBE_SIZE * 0.94, CUBE_SIZE * 0.94, CUBE_SIZE * 0.94);
+            const edgeMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+
+            for (let x = -1; x <= 1; x++) {
+                for (let y = -1; y <= 1; y++) {
+                    for (let z = -1; z <= 1; z++) {
+                        
+                        const materials = [
+                            new THREE.MeshPhongMaterial({ color: x === 1 ? COLORS.R : COLORS.CORE, shininess: 50 }),
+                            new THREE.MeshPhongMaterial({ color: x === -1 ? COLORS.L : COLORS.CORE, shininess: 50 }),
+                            new THREE.MeshPhongMaterial({ color: y === 1 ? COLORS.U : COLORS.CORE, shininess: 50 }),
+                            new THREE.MeshPhongMaterial({ color: y === -1 ? COLORS.D : COLORS.CORE, shininess: 50 }),
+                            new THREE.MeshPhongMaterial({ color: z === 1 ? COLORS.F : COLORS.CORE, shininess: 50 }),
+                            new THREE.MeshPhongMaterial({ color: z === -1 ? COLORS.B : COLORS.CORE, shininess: 50 }),
+                        ];
+
+                        const cubie = new THREE.Mesh(geometry, materials);
+                        cubie.position.set(
+                            x * (CUBE_SIZE + SPACING),
+                            y * (CUBE_SIZE + SPACING),
+                            z * (CUBE_SIZE + SPACING)
+                        );
+                        cubie.castShadow = true;
+                        cubie.receiveShadow = true;
+                        
+                        // Add black inset for realism
+                        const edgeMesh = new THREE.Mesh(edgeGeo, edgeMat);
+                        cubie.add(edgeMesh);
+
+                        scene.add(cubie);
+                        allCubies.push(cubie);
+                    }
+                }
+            }
+        }
+
+        // --- Logic: Rotation & Solving ---
+
+        function queueMove(axis, layer, direction, record = true) {
+            animationQueue.push({ axis, layer, direction, record });
+        }
+
+        function runAnimationQueue() {
+            if (isAnimating || animationQueue.length === 0) return;
+
+            const move = animationQueue.shift();
+            performRotation(move.axis, move.layer, move.direction, move.record);
+        }
+
+        function performRotation(axis, layer, direction, record) {
+            isAnimating = true;
+
+            // Find cubies in the target layer
+            // Note: We use a small epsilon (0.1) for float comparison
+            const activeCubies = allCubies.filter(cubie => {
+                return Math.abs(cubie.position[axis] - (layer * (CUBE_SIZE + SPACING))) < 0.1;
+            });
+
+            // Reset pivot
+            pivot.rotation.set(0, 0, 0);
+            pivot.position.set(0, 0, 0);
+            
+            // Attach cubies to pivot
+            activeCubies.forEach(cubie => {
+                pivot.attach(cubie);
+            });
+
+            // Animate
+            const targetRotation = (Math.PI / 2) * direction * -1; 
+            
+            const animateTurn = () => {
+                const step = ANIMATION_SPEED;
+                let finished = false;
+
+                if (direction === 1) {
+                    pivot.rotation[axis] -= step;
+                    if (pivot.rotation[axis] <= targetRotation) {
+                        pivot.rotation[axis] = targetRotation;
+                        finished = true;
+                    }
+                } else {
+                    pivot.rotation[axis] += step;
+                    if (pivot.rotation[axis] >= targetRotation) {
+                        pivot.rotation[axis] = targetRotation;
+                        finished = true;
+                    }
+                }
+
+                if (!finished) {
+                    requestAnimationFrame(animateTurn);
+                } else {
+                    // Finalize transform
+                    pivot.updateMatrixWorld();
+                    activeCubies.forEach(cubie => {
+                        scene.attach(cubie);
+                        
+                        // Snap positions to integer grid steps to prevent drift
+                        const gridStep = CUBE_SIZE + SPACING;
+                        cubie.position.x = Math.round(cubie.position.x / gridStep) * gridStep;
+                        cubie.position.y = Math.round(cubie.position.y / gridStep) * gridStep;
+                        cubie.position.z = Math.round(cubie.position.z / gridStep) * gridStep;
+                        
+                        // Snap rotations
+                        const qtr = Math.PI / 2;
+                        cubie.rotation.x = Math.round(cubie.rotation.x / qtr) * qtr;
+                        cubie.rotation.y = Math.round(cubie.rotation.y / qtr) * qtr;
+                        cubie.rotation.z = Math.round(cubie.rotation.z / qtr) * qtr;
+                        
+                        cubie.updateMatrix();
+                    });
+
+                    // Record Move Logic
+                    if (record) {
+                        // Push Inverse to stack
+                        moveStack.push({ axis, layer, direction: -direction });
+                        updateUI();
+                    } 
+                    
+                    // Cleanup stack if solving (optional, but UI update handles visual count)
+                    if (!record && moveStack.length > 0) {
+                        // We are popping externally, just update UI
+                        updateUI();
+                    }
+
+                    isAnimating = false;
+                    runAnimationQueue();
+                }
+            };
+
+            animateTurn();
+        }
+
+        // --- Input Handling ---
+
+        function handleManualMove(face, inverse) {
+            // Direction 1 = Clockwise (Standard), -1 = Counter-Clockwise (Prime)
+            // Note: Mathematical rotation axis direction might differ from Standard Notation
+            // Standard: Clockwise looking at the face
+            
+            let axis, layer, dir;
+            // Standard Notation Logic
+            const directionMult = inverse ? -1 : 1;
+
+            switch(face) {
+                case 'U': // Up (Y axis, Top layer)
+                    axis = 'y'; layer = 1; dir = 1 * directionMult; 
+                    break;
+                case 'D': // Down (Y axis, Bottom layer)
+                    // D clockwise is opposite to U from top view, but standard notation is CW looking at D face
+                    // Looking from bottom, CW rotation is positive Y rotation in ThreeJS? No, negative.
+                    axis = 'y'; layer = -1; dir = 1 * directionMult; 
+                    break;
+                case 'L': // Left (X axis, Left layer)
+                    axis = 'x'; layer = -1; dir = 1 * directionMult; 
+                    break;
+                case 'R': // Right (X axis, Right layer)
+                    axis = 'x'; layer = 1; dir = 1 * directionMult; 
+                    break;
+                case 'F': // Front (Z axis, Front layer)
+                    axis = 'z'; layer = 1; dir = 1 * directionMult; 
+                    break;
+                case 'B': // Back (Z axis, Back layer)
+                    axis = 'z'; layer = -1; dir = 1 * directionMult; 
+                    break;
+            }
+            
+            // Adjust specific axes for Visual Consistency with Standard Notation
+            // ThreeJS coordinates: Right(+x), Up(+y), Front(+z)
+            // Standard CW check:
+            // R (Right Face): looking at right, CW -> rotates -x
+            if (face === 'R') dir *= -1; 
+            // L (Left Face): looking at left, CW -> rotates +x
+            if (face === 'L') dir *= -1;
+            // U (Up Face): looking from top, CW -> rotates -y
+            if (face === 'U') dir *= -1;
+            // D (Down Face): looking from bottom, CW -> rotates +y
+            if (face === 'D') dir *= -1;
+            // F (Front Face): looking at front, CW -> rotates -z
+            if (face === 'F') dir *= -1;
+            // B (Back Face): looking at back, CW -> rotates +z
+            if (face === 'B') dir *= -1;
+
+            queueMove(axis, layer, dir, true);
+        }
+
+        function handleKeyboard(e) {
+            if (isAnimating) return;
+            const key = e.key.toUpperCase();
+            const validKeys = ['U', 'D', 'L', 'R', 'F', 'B'];
+            
+            if (validKeys.includes(key)) {
+                // If Shift is pressed, inverse is true
+                // Note: e.key already handles 'u' vs 'U', but e.shiftKey tells us specifically 
+                // However, standard typing 'U' implies Shift+u usually. 
+                // Let's rely on e.shiftKey explicit check or just the key code.
+                
+                // Better approach: Check key char + shiftKey boolean
+                const inverse = e.shiftKey;
+                handleManualMove(key, inverse);
+                
+                // Sync UI Checkbox for visual feedback
+                chkInverse.checked = inverse;
+            }
+        }
+
+        // --- High Level Functions ---
+
+        function scramble() {
+            if (isAnimating) return;
+            
+            const axes = ['x', 'y', 'z'];
+            const layers = [-1, 0, 1];
+            const directions = [1, -1];
+            
+            const numMoves = 20;
+
+            for (let i = 0; i < numMoves; i++) {
+                const axis = axes[Math.floor(Math.random() * axes.length)];
+                const layer = layers[Math.floor(Math.random() * layers.length)];
+                const dir = directions[Math.floor(Math.random() * directions.length)];
+                
+                queueMove(axis, layer, dir, true);
+            }
+            runAnimationQueue();
+        }
+
+        function solve() {
+            if (isAnimating || moveStack.length === 0) return;
+
+            const solveInterval = setInterval(() => {
+                if (moveStack.length === 0) {
+                    clearInterval(solveInterval);
+                    return;
+                }
+                
+                // Only queue next move if animation queue is low to prevent overload
+                if (animationQueue.length < 2) {
+                    const move = moveStack.pop();
+                    queueMove(move.axis, move.layer, move.direction, false); // record=false
+                    updateUI();
+                }
+            }, 100);
+            
+            runAnimationQueue();
+        }
+
+        function updateUI() {
+            moveCounter.innerText = moveStack.length;
+            btnSolve.disabled = moveStack.length === 0;
+            
+            // Visual toggle of scramble button text
+            btnScramble.innerText = moveStack.length > 0 ? "Add Scramble" : "Scramble";
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            resizeBg(); // Resize background too
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            drawBackground(); // Update background
+
+            controls.update();
+            renderer.render(scene, camera);
+            runAnimationQueue();
+        }
+
+        // --- Start ---
+        init();
+
+    </script>
+</body>
+</html>
